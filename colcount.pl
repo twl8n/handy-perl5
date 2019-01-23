@@ -39,14 +39,14 @@ main:
 	$sep_char = ",";
     }
    
-    my $csv = Text::CSV->new( { sep_char => $sep_char });
+    my $csv = Text::CSV->new( { sep_char => $sep_char, binary => 1 });
 
     my $fh = 0;
     if (! $ARGV[0] || $ARGV[0] eq "-")
     {
 	$fh = *STDIN;
     }
-    elsif (open(IN, "< $ARGV[0]"))
+    elsif (open(IN, "<", $ARGV[0]))
     {
 	$fh = *IN;
     }
@@ -92,16 +92,40 @@ main:
 
     show_rec(\@values, \@labels, $fmt);
 
-    my $yy = 1;
-    while(my $temp = <$fh>)
-    {
-	my $status  = $csv->parse($temp);
-	my @cols = $csv->fields();  
-	my $curr_cols = scalar(@values);
-	show_rec(\@cols, \@labels, $fmt);
-	$yy++;
-    }
+    # https://metacpan.org/pod/Text::CSV#SYNOPSIS
+    # Best way to read csv with embedded newlines
 
+    # my $csv = Text::CSV->new ({ binary => 1 });
+    # open my $fh, "<", $file or die "$file: $!";
+    # while (my $row = $csv->getline ($fh)) {
+    #     my @fields = @$row;
+    # }
+
+    if (1) # read embedded newlines, but then strip change newlines to space.
+    {
+        my $yy = 1;
+        while (my $row = $csv->getline ($fh)) {
+            my @cols = @$row;
+            # my $curr_cols = scalar(@values);
+            # Idiomatic Perl: $_ =~ s/\n//g for @cols;
+            map {s/\n/ /g} @cols;
+            show_rec(\@cols, \@labels, $fmt);
+            $yy++;
+        }
+    }
+    else
+    {
+        my $yy = 1;
+        while(my $temp = <$fh>)
+        {
+            my $status  = $csv->parse($temp);
+            my @cols = $csv->fields();  
+            # What?? The line below does nothing. 
+            # my $curr_cols = scalar(@values);
+            show_rec(\@cols, \@labels, $fmt);
+            $yy++;
+        }
+    }
 }
 
 sub show_rec
@@ -238,7 +262,7 @@ sub readfile
     # open(IN, "<", "$_[0]");
     # Keep the old style, until the next version so that we don't have to retest everything.
     # 
-    open(IN, "< $_[0]");
+    open(IN, "<", $_[0]);
     sysread(IN, $temp, $stat_array[7]);
     close(IN);
     return $temp;
